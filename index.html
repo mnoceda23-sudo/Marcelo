@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0C0E10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Build the Next">
+  <title>Build the Next</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Manrope:wght@400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<div class="login" id="login" hidden>
+  <div class="login-card">
+    <div class="brand" style="font-size:34px"><span>BUILD</span><span>THE NEXT</span></div>
+    <div class="tagline">SHOW UP. DO THE WORK. LOG THE RESULT.</div>
+    <form id="loginForm" class="stack" novalidate>
+      <div class="field">
+        <label for="loginEmail">Tu email</label>
+        <input id="loginEmail" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="tu@email.com">
+      </div>
+      <button class="btn primary" type="submit" id="loginBtn">Enviarme el link de acceso</button>
+      <div id="loginMsg" class="small" hidden></div>
+    </form>
+    <div class="small muted">Te llega un correo con un link. Ábrelo en este mismo dispositivo.</div>
+  </div>
+</div>
+<div class="app" id="app" hidden>
+  <aside class="side">
+    <div>
+      <div class="brand"><span>BUILD</span><span>THE NEXT</span></div>
+      <div class="tagline">SHOW UP. DO THE WORK.<br>LOG THE RESULT.</div>
+    </div>
+    <nav class="nav" id="sidenav" aria-label="Secciones"></nav>
+    <div class="side-foot">
+      <div id="cycleMini" class="small muted"></div>
+      <div id="sync" class="syncchip"><i></i><span>Conectando</span></div>
+    </div>
+  </aside>
+  <main>
+    <div class="topbar">
+      <div class="brand"><span>BUILD </span><span>THE NEXT</span></div>
+      <div id="topMeta" class="eyebrow"></div>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+<nav class="bottom" id="bottomnav" aria-label="Secciones" hidden></nav>
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head"><h3 id="sheetTitle"></h3><button class="btn ghost sm" data-act="closeSheet" type="button">Cerrar</button></div>
+    <form id="sheetForm" class="stack" novalidate></form>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
