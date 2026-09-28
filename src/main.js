@@ -897,7 +897,7 @@ function vAjustes() {
       ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<div class="field"><label for="s-ag${d}">${DOW[d].replace(/^./, (x) => x.toUpperCase())}</label><input id="s-ag${d}" type="text" name="agenda.${d}" value="${esc((c.agenda[String(d)] || []).join(", "))}"><span class="hint">Separa con comas</span></div>`).join("")}
     </div></fieldset>
     <div id="settingsErr" class="err" hidden></div>
-    <div class="row"><button class="btn primary" type="submit">Guardar ajustes</button><button class="btn" type="button" data-act="export">Exportar datos (JSON)</button><button class="btn ghost" type="button" data-act="logout">Cerrar sesión${S.user?.email ? " · " + esc(S.user.email) : ""}</button></div>
+    <div class="row"><button class="btn primary" type="submit">Guardar ajustes</button><button class="btn" type="button" data-act="export">Exportar datos (JSON)</button><button class="btn" type="button" data-act="setPass">Crear / cambiar contraseña</button><button class="btn ghost" type="button" data-act="logout">Cerrar sesión${S.user?.email ? " · " + esc(S.user.email) : ""}</button></div>
   </form>`;
 }
 
@@ -1090,11 +1090,22 @@ const ACT = {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
+  setPass: () => openSheet("Contraseña", `<p class="small muted">Con esta contraseña entras desde cualquier dispositivo sin esperar el correo.</p>
+    <div class="field"><label for="f-pw1">Nueva contraseña</label><input id="f-pw1" name="pw1" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div class="field"><label for="f-pw2">Repítela</label><input id="f-pw2" name="pw2" type="password" autocomplete="new-password" required></div>`, (fd) => {
+    const pw = fd.get("pw1");
+    if (pw.length < 8) return sheetErr("Usa al menos 8 caracteres.");
+    if (pw !== fd.get("pw2")) return sheetErr("Las contraseñas no coinciden.");
+    sb.auth.updateUser({ password: pw }).then(({ error }) => {
+      if (error) sheetErr(error.code === "same_password" ? "Es la misma contraseña que ya tenías." : "No se pudo guardar: " + error.message);
+      else { closeSheet(); toast("Contraseña guardada"); }
+    });
+  }, "Guardar contraseña"),
   logout: async () => { await sb.auth.signOut(); location.hash = ""; location.reload(); }
 };
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]"); if (!b || b.disabled) return;
-  if (S.readOnly && !["nav", "more", "prevDay", "nextDay", "todayBtn", "openDay", "closeSheet", "wk", "wizBack", "export", "logout"].includes(b.dataset.act)) { toast("Solo lectura"); return; }
+  if (S.readOnly && !["nav", "more", "prevDay", "nextDay", "todayBtn", "openDay", "closeSheet", "wk", "wizBack", "export", "setPass", "logout"].includes(b.dataset.act)) { toast("Solo lectura"); return; }
   e.preventDefault(); ACT[b.dataset.act]?.(b, e);
 });
 document.getElementById("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") closeSheet(); });
@@ -1151,46 +1162,37 @@ async function startSession(user) {
   S.user = user; S.mode = "loading"; showApp(true); render();
   await refresh();
 }
-// Login in two steps: send the email, then type the code it contains. The code is verified
-// inside this app, so the session is stored here even when the app runs from the home screen
-// (iOS keeps home-screen apps' storage separate from Safari, where email links open).
+// Email + password is the main login: it signs in inside this app, so the session is stored
+// here even when the app runs from the iOS home screen (whose storage is separate from Safari,
+// where email links open). The emailed link is only for the first sign-in or a forgotten password.
 const loginEl = (id) => document.getElementById(id);
-let codeSent = false;
 try { loginEl("loginEmail").value = localStorage.getItem("btn.email") || ""; } catch {}
-function setCodeStep(on) {
-  codeSent = on;
-  loginEl("codeField").hidden = !on; loginEl("loginBack").hidden = !on;
-  loginEl("loginEmail").readOnly = on;
-  loginEl("loginBtn").textContent = on ? "Entrar" : "Enviarme el código";
-  if (on) loginEl("loginCode").focus(); else loginEl("loginCode").value = "";
+function loginMsg(text, cls = "small") { const m = loginEl("loginMsg"); m.hidden = !text; m.className = cls; m.textContent = text; }
+function loginEmail() {
+  const email = loginEl("loginEmail").value.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { loginMsg("Escribe un email válido.", "err"); return null; }
+  try { localStorage.setItem("btn.email", email); } catch {}
+  return email;
 }
-loginEl("loginBack").addEventListener("click", () => { setCodeStep(false); loginEl("loginMsg").hidden = true; });
 loginEl("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const email = loginEl("loginEmail").value.trim(), msg = loginEl("loginMsg"), btn = loginEl("loginBtn");
-  msg.hidden = false; msg.className = "small";
-  if (codeSent) {
-    const token = loginEl("loginCode").value.replace(/\D/g, "");
-    if (token.length < 6) { msg.className = "err"; msg.textContent = "Escribe el código completo del correo."; return; }
-    btn.disabled = true; msg.textContent = "Verificando…";
-    const { error } = await sb.auth.verifyOtp({ email, token, type: "email" });
-    btn.disabled = false;
-    if (error) { msg.className = "err"; msg.textContent = "Código incorrecto o vencido. Revisa el último correo o pide otro."; return; }
-    msg.hidden = true; setCodeStep(false);
-    return;
-  }
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.className = "err"; msg.textContent = "Escribe un email válido."; return; }
-  btn.disabled = true; msg.textContent = "Enviando…";
+  const email = loginEmail(), password = loginEl("loginPass").value, btn = loginEl("loginBtn");
+  if (!email) return;
+  if (!password) { loginMsg("Escribe tu contraseña.", "err"); return; }
+  btn.disabled = true; loginMsg("Entrando…");
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false;
+  if (error) loginMsg(error.status === 400 ? "Email o contraseña incorrectos. Si aún no creaste tu contraseña, usa el link por correo." : "No se pudo entrar: " + error.message, "err");
+  else { loginMsg(""); loginEl("loginPass").value = ""; }
+});
+loginEl("loginLink").addEventListener("click", async () => {
+  const email = loginEmail(), btn = loginEl("loginLink");
+  if (!email) return;
+  btn.disabled = true; loginMsg("Enviando…");
   const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin } });
   btn.disabled = false;
-  if (error) {
-    msg.className = "err";
-    msg.textContent = error.status === 429 ? "Se enviaron demasiados correos. Espera unos minutos y vuelve a intentarlo." : "No se pudo enviar el correo: " + error.message;
-    return;
-  }
-  try { localStorage.setItem("btn.email", email); } catch {}
-  msg.className = "small ok-msg"; msg.textContent = `Listo. Revisa ${email} y escribe aquí el código.`;
-  setCodeStep(true);
+  if (error) loginMsg(error.status === 429 ? "Se enviaron demasiados correos. Espera unos minutos y vuelve a intentarlo." : "No se pudo enviar el correo: " + error.message, "err");
+  else loginMsg(`Listo. Revisa ${email}, abre el link y crea tu contraseña en Ajustes.`, "small ok-msg");
 });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(); });
 setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 60000);
