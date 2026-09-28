@@ -22,10 +22,15 @@
         <label for="loginEmail">Tu email</label>
         <input id="loginEmail" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="tu@email.com">
       </div>
-      <button class="btn primary" type="submit" id="loginBtn">Enviarme el link de acceso</button>
+      <div class="field" id="codeField" hidden>
+        <label for="loginCode">Código del correo</label>
+        <input id="loginCode" name="code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="123456">
+      </div>
+      <button class="btn primary" type="submit" id="loginBtn">Enviarme el código</button>
+      <button class="btn ghost sm" type="button" id="loginBack" hidden>Usar otro email / reenviar</button>
       <div id="loginMsg" class="small" hidden></div>
     </form>
-    <div class="small muted">Te llega un correo con un link. Ábrelo en este mismo dispositivo.</div>
+    <div class="small muted">Te llega un correo con un código. Escríbelo aquí y la sesión queda guardada en este dispositivo.</div>
   </div>
 </div>
 <div class="app" id="app" hidden>

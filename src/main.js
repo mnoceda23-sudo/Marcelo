@@ -1151,10 +1151,34 @@ async function startSession(user) {
   S.user = user; S.mode = "loading"; showApp(true); render();
   await refresh();
 }
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
+// Login in two steps: send the email, then type the code it contains. The code is verified
+// inside this app, so the session is stored here even when the app runs from the home screen
+// (iOS keeps home-screen apps' storage separate from Safari, where email links open).
+const loginEl = (id) => document.getElementById(id);
+let codeSent = false;
+try { loginEl("loginEmail").value = localStorage.getItem("btn.email") || ""; } catch {}
+function setCodeStep(on) {
+  codeSent = on;
+  loginEl("codeField").hidden = !on; loginEl("loginBack").hidden = !on;
+  loginEl("loginEmail").readOnly = on;
+  loginEl("loginBtn").textContent = on ? "Entrar" : "Enviarme el código";
+  if (on) loginEl("loginCode").focus(); else loginEl("loginCode").value = "";
+}
+loginEl("loginBack").addEventListener("click", () => { setCodeStep(false); loginEl("loginMsg").hidden = true; });
+loginEl("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const email = document.getElementById("loginEmail").value.trim(), msg = document.getElementById("loginMsg"), btn = document.getElementById("loginBtn");
+  const email = loginEl("loginEmail").value.trim(), msg = loginEl("loginMsg"), btn = loginEl("loginBtn");
   msg.hidden = false; msg.className = "small";
+  if (codeSent) {
+    const token = loginEl("loginCode").value.replace(/\D/g, "");
+    if (token.length < 6) { msg.className = "err"; msg.textContent = "Escribe el código completo del correo."; return; }
+    btn.disabled = true; msg.textContent = "Verificando…";
+    const { error } = await sb.auth.verifyOtp({ email, token, type: "email" });
+    btn.disabled = false;
+    if (error) { msg.className = "err"; msg.textContent = "Código incorrecto o vencido. Revisa el último correo o pide otro."; return; }
+    msg.hidden = true; setCodeStep(false);
+    return;
+  }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.className = "err"; msg.textContent = "Escribe un email válido."; return; }
   btn.disabled = true; msg.textContent = "Enviando…";
   const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin } });
@@ -1164,7 +1188,9 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     msg.textContent = error.status === 429 ? "Se enviaron demasiados correos. Espera unos minutos y vuelve a intentarlo." : "No se pudo enviar el correo: " + error.message;
     return;
   }
-  msg.className = "small ok-msg"; msg.textContent = `Listo. Revisa ${email} y abre el link en este dispositivo.`;
+  try { localStorage.setItem("btn.email", email); } catch {}
+  msg.className = "small ok-msg"; msg.textContent = `Listo. Revisa ${email} y escribe aquí el código.`;
+  setCodeStep(true);
 });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(); });
 setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 60000);
